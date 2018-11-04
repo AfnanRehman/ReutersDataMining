@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Oct 12 01:30:28 2018
-
 @author: Afnan
 """
+from bs4 import BeautifulSoup
+
 # This method works like str.split, but splits for as many times as a delimiter shows up in the doc
 # It is also original work based on prior knowledge of how string splits work in Python.
 def multi_splitter(input_string, delimiter): 
@@ -13,6 +13,69 @@ def multi_splitter(input_string, delimiter):
         sub = str_element.split("</D>")
         out_strings.append(sub[0])
     return out_strings
+
+
+def get_text(place, sources, places_bag_vector):
+    # This portion involving reading the body text in from the file mostly done by Kumar
+    print (place)
+    total_text = ""
+    for source in sources:
+        print (source)
+        with open(source) as f:
+            data = f.read()
+            soup = BeautifulSoup(data, 'html.parser') # parse using HTML parser, close to structure of these files
+            reuters_tags = soup.find_all('reuters')
+            for reuter_tag in reuters_tags: # get information stored within each reuters tag
+                places_tag = reuter_tag.places
+                d_tags = places_tag.find_all('d') # find all places/topics mentioned
+                for d_tag in d_tags:
+                    for child in d_tag.children: # find relevant tags to current call and add text to a master string
+                        if(place == child):
+                            try:
+                                total_text += reuter_tag.body.get_text()
+                            except:
+                                total_text += ""
+                            
+    # This subsequent section is devoted to removing a few bits of rather unwieldy extra characters in our 
+    # output string. We wanted to retain as many words as possible, so more tedious methods of extraction,
+    # such as removing '\n' from the MIDDLE of the word was required. This part written by Afnan.
+    array = total_text.split()
+    new_array = []
+    for word in array: # each word gets examined and picked apart if it contains the offending characters
+        new_word = ""
+        if '\n' in word: # removing line breaks, wherever they may occur
+            subword = word.split('\n')
+            for part in subword:
+                if '\n' not in part:
+                    new_word += part
+                    word = new_word
+        new_word = ""
+        if '.' in word: # removing punctuation
+            subword = word.split('.')
+            for part in subword:
+                if '.' not in part:
+                    new_word += part
+                    word = new_word
+        word += " "
+        new_array.append(word)
+        
+    cleaned_text = ""
+    for newword in new_array:# now removing some final pesky words as well as any numbers we don't want in our analysis
+        if "reuter" not in newword.lower() and "\x03" not in newword and newword.isdigit() == False:
+            cleaned_text += newword
+    # Optionally, add the finished bag of words to a output file
+    """
+    file= open(place+'.txt', "a")
+    try:
+        file.write(cleaned_text)
+    except:
+        file.write("")
+    file.close();                        
+    """
+    # Create vector and return to calling function
+    places_bag_vector[place] = cleaned_text
+    # output looks like: {'afghanistan' : 'Pakistan complained to the United Nations today that...', 'algeria' : 'Liquefied natural gas imports from Algeria...', ....}
+    return places_bag_vector
 
 if __name__ == "__main__":
     sources = ["files/reut2-000.sgm", "files/reut2-001.sgm", "files/reut2-002.sgm", \
@@ -91,6 +154,10 @@ if __name__ == "__main__":
         
     # At the end here I printed some statistics that I could use in the report document.
     print("Total countries: " + str(len(set(total_countries))-2))
+    bag_vector = {}
+    for country in sorted(set(total_countries)): #this can take quite a while, leave commented out for performance
+        if "<PLACES>" not in country:
+            get_text(country, sources, bag_vector)
     print(sorted(set(total_countries))) # Final list is alphabetized for ease of reading
     print("Total topics: " + str(len(set(total_topics))-2))
     print(sorted(set(total_topics))) # Final list is alphabetized for ease of reading
