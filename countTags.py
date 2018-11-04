@@ -3,6 +3,81 @@
 @author: Afnan
 """
 from bs4 import BeautifulSoup
+from typing import Tuple
+import itertools
+import csv
+# BEGIN PART FROM https://towardsdatascience.com/implementing-a-trie-data-structure-in-python-in-less-than-100-lines-of-code-a877ea23c1a1
+class TrieNode(object):
+    """
+    Trie node implementation.
+    """
+    
+    def __init__(self, char: str):
+        self.char = char
+        self.children = []
+        # Is it the last character of the word.
+        self.word_finished = False
+        # How many times this character appeared in the addition process
+        self.counter = 1
+    
+
+def add(root, word: str):
+    """
+    Adding a word in the trie structure
+    """
+    node = root
+    for char in word:
+        found_in_child = False
+        # Search for the character in the children of the present `node`
+        for child in node.children:
+            if child.char == char:
+                # We found it, increase the counter by 1 to keep track that another
+                # word has it as well
+                child.counter += 1
+                # And point the node to the child that contains this char
+                node = child
+                found_in_child = True
+                break
+        # We did not find it so add a new chlid
+        if not found_in_child:
+            new_node = TrieNode(char)
+            node.children.append(new_node)
+            # And then point node to the new child
+            node = new_node
+    # Everything finished. Mark it as the end of a word.
+    node.word_finished = True
+
+
+def find_prefix(root, prefix: str) -> Tuple[bool, int]:
+    """
+    Check and return 
+      1. If the prefix exsists in any of the words we added so far
+      2. If yes then how may words actually have the prefix
+    """
+    node = root
+    # If the root node has no children, then return False.
+    # Because it means we are trying to search in an empty trie
+    if not root.children:
+        return False, 0
+    for char in prefix:
+        char_not_found = True
+        # Search through all the children of the present `node`
+        for child in node.children:
+            if child.char == char:
+                # We found the char existing in the child.
+                char_not_found = False
+                # Assign node as the child containing the char and break
+                node = child
+                break
+        # Return False anyway when we did not find a char.
+        if char_not_found:
+            return False, 0
+    # Well, we are here means we have found the prefix. Return true to indicate that
+    # And also the counter of the last node. This indicates how many words have this
+    # prefix
+    return True, node.counter
+
+# END PART FROM https://towardsdatascience.com/implementing-a-trie-data-structure-in-python-in-less-than-100-lines-of-code-a877ea23c1a1
 
 # This method works like str.split, but splits for as many times as a delimiter shows up in the doc
 # It is also original work based on prior knowledge of how string splits work in Python.
@@ -56,22 +131,36 @@ def get_text(place, sources, places_bag_vector):
                 if '.' not in part:
                     new_word += part
                     word = new_word
+        new_word = ""
+        if ',' in word: # removing punctuation
+            subword = word.split(',')
+            for part in subword:
+                if ',' not in part:
+                    new_word += part
+                    word = new_word
+        new_word = ""
+        if '"' in word: # removing punctuation
+            subword = word.split('"')
+            for part in subword:
+                if '"' not in part:
+                    new_word += part
+                    word = new_word
         word += " "
         new_array.append(word)
         
     cleaned_text = ""
     for newword in new_array:# now removing some final pesky words as well as any numbers we don't want in our analysis
-        if "reuter" not in newword.lower() and "\x03" not in newword and newword.isdigit() == False:
+        if "reuter" not in newword.lower() and "\x03" not in newword and '"' not in newword and newword.isdigit() == False:
             cleaned_text += newword
     # Optionally, add the finished bag of words to a output file
-    """
+    cleaned_text.rstrip()
     file= open(place+'.txt', "a")
     try:
         file.write(cleaned_text)
     except:
         file.write("")
     file.close();                        
-    """
+    
     # Create vector and return to calling function
     places_bag_vector[place] = cleaned_text
     # output looks like: {'afghanistan' : 'Pakistan complained to the United Nations today that...', 'algeria' : 'Liquefied natural gas imports from Algeria...', ....}
@@ -84,13 +173,12 @@ if __name__ == "__main__":
                "files/reut2-009.sgm", "files/reut2-010.sgm", "files/reut2-011.sgm", \
                "files/reut2-012.sgm", "files/reut2-013.sgm", "files/reut2-014.sgm", \
                "files/reut2-015.sgm", "files/reut2-016.sgm", "files/reut2-017.sgm", \
-               "files/reut2-018.sgm", "files/reut2-019.sgm", "files/reut2-020.sgm", \
-               "files/reut2-021.sgm"]
+               "files/reut2-018.sgm"]
     total_blank_places = 0
     total_blank_topics = 0
     total_countries = []
     total_topics = []
-    
+    root = TrieNode('*')
     
     # Here, my algorithm for splitting the elements of the TOPICS and PLACES fields is my original work
     for source in sources:
@@ -151,16 +239,29 @@ if __name__ == "__main__":
             if topic == "<TOPICS></TOPICS>\n":
                 count_blanks += 1
         total_blank_topics += count_blanks
-        
-    # At the end here I printed some statistics that I could use in the report document.
-    print("Total countries: " + str(len(set(total_countries))-2))
+    # Here we begin to make our country-based classifier
     bag_vector = {}
+    countrys = ['uk', 'france', 'canada']
     for country in sorted(set(total_countries)): #this can take quite a while, leave commented out for performance
         if "<PLACES>" not in country:
             get_text(country, sources, bag_vector)
-    print(sorted(set(total_countries))) # Final list is alphabetized for ease of reading
-    print("Total topics: " + str(len(set(total_topics))-2))
-    print(sorted(set(total_topics))) # Final list is alphabetized for ease of reading
-    print("Total blank places: " + str(total_blank_places))
-    print("Total blank topics: " + str(total_blank_topics))
+    with open('bag_train.csv', 'w') as csv_file:
+        writer = csv.writer(csv_file)
+        for key, value in bag_vector.items():
+            writer.writerow([key, value])
+    '''
+    # Now, to finally make a word count vector!
+    last_vector = {}
+    bag = bag_vector.get("argentina")
+    bag = bag.split()
+    for word in bag:
+        add(root,word)
+    for word in bag:
+        count = find_prefix(root, word)[1]
+        last_vector[word] = count
+    last_vector=sorted(last_vector.items(), key=lambda x: x[1], reverse=True)
+    last_vector = dict(last_vector)
+    last_vector=dict(itertools.islice(last_vector.items(),50))
+    '''
+    
         
