@@ -68,37 +68,33 @@ def predictions(test_x, nBS):
     for index, row in test_x.iterrows():
         i, t = row['id'], row['text']
         p = recognize(t, nBS)
-        d.append({'id': i, 'wheat': float(p['wheat']), 'earn': float(p['earn']), 'housing': float(p['housing'])})
+        d.append({'id': i, 'wheat': float(p['wheat']), 'jobs': float(p['jobs'])})
     
     return pd.DataFrame(data=d)
 
-train_x = pd.read_csv("topic_bag_train.csv", sep=',', encoding = "ISO-8859-1", engine='python')
-test_x = pd.read_csv("topic_bag_test.csv", sep=',', encoding = "ISO-8859-1", engine='python')
+for x in range(3):
 
-
-canada, uk, pak = "", "", ""
-
-for i, row in train_x.iterrows():
-    a, t = row['topic'], row['text']
-    if a == 'wheat':
-        canada += " " + t.lower()
-    elif a == 'earn':
-        uk += " " + t.lower()
-    elif a == 'housing':
-        pak += " " + t.lower()
-        
-print (uk[:50])
-
-canada = word_tokenize(canada)
-uk = word_tokenize(uk)
-pak = word_tokenize(pak)
-
-print (uk[:50])
-c_canada, c_uk, c_pak = create_dist(canada),  create_dist(uk),  create_dist(pak)
-
-dist = {'wheat': c_canada, 'earn': c_uk, 'housing' : c_pak}
-nBS = NaiveBayes(dist)
-
-
-submission = predictions(test_x, nBS)
-submission.to_csv('submission_topic.csv', index=False)
+    train_x = pd.read_csv("topic_bag_train" + str(x) + ".csv", sep=',', encoding = "ISO-8859-1", engine='python')
+    test_x = pd.read_csv("topic_bag_test" + str(x) + ".csv", sep=',', encoding = "ISO-8859-1", engine='python')
+    
+    
+    wheat, jobs = "", ""
+    
+    for i, row in train_x.iterrows():
+        a, t = row['topic'], row['text']
+        if a == 'wheat':
+            wheat += " " + t.lower()
+        elif a == 'jobs':
+            jobs += " " + t.lower()       
+    
+    wheat = word_tokenize(wheat)
+    jobs = word_tokenize(jobs)
+    
+    c_wheat, c_jobs = create_dist(wheat),  create_dist(jobs)
+    
+    dist = {'wheat': c_wheat, 'jobs': c_jobs}
+    nBS = NaiveBayes(dist)
+    
+    
+    submission = predictions(test_x, nBS)
+    submission.to_csv('results_topic' + str(x) + '.csv', index=False)

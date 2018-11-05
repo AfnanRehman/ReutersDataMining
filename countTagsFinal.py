@@ -5,7 +5,6 @@ Note: some of this is carried over from lab 1
 """
 from bs4 import BeautifulSoup
 from typing import Tuple
-import itertools
 import csv
 # BEGIN PART FROM https://towardsdatascience.com/implementing-a-trie-data-structure-in-python-in-less-than-100-lines-of-code-a877ea23c1a1
 class TrieNode(object):
@@ -91,19 +90,21 @@ def multi_splitter(input_string, delimiter):
     return out_strings
 
 
-def get_text(place, sources, places_bag_vector):
+def get_text(place, sources, places_bag_vector, t_type):
     # This portion involving reading the body text in from the file mostly done by Kumar
     print (place)
     total_text = ""
     for source in sources:
-        print (source)
         with open(source) as f:
             data = f.read()
             soup = BeautifulSoup(data, 'html.parser') # parse using HTML parser, close to structure of these files
             reuters_tags = soup.find_all('reuters')
             for reuter_tag in reuters_tags: # get information stored within each reuters tag
-                places_tag = reuter_tag.topics
-                d_tags = places_tag.find_all('d') # find all places/topics mentioned
+                if t_type == 'topics':
+                    p_tag = reuter_tag.topics
+                else:
+                    p_tag = reuter_tag.places
+                d_tags = p_tag.find_all('d') # find all places/topics mentioned
                 for d_tag in d_tags:
                     for child in d_tag.children: # find relevant tags to current call and add text to a master string
                         if(place == child):
@@ -171,16 +172,20 @@ if __name__ == "__main__":
     sources = ["files/reut2-000.sgm", "files/reut2-001.sgm", "files/reut2-002.sgm", \
                "files/reut2-003.sgm", "files/reut2-004.sgm", "files/reut2-005.sgm", \
                "files/reut2-006.sgm", "files/reut2-007.sgm", "files/reut2-008.sgm", \
-               "files/reut2-009.sgm", "files/reut2-010.sgm"]
+               "files/reut2-009.sgm", "files/reut2-010.sgm", "files/reut2-011.sgm", \
+               "files/reut2-012.sgm", "files/reut2-013.sgm", "files/reut2-014.sgm", \
+               "files/reut2-015.sgm", "files/reut2-016.sgm", "files/reut2-017.sgm", \
+               "files/reut2-018.sgm", "files/reut2-019.sgm", "files/reut2-020.sgm", \
+               "files/reut2-021.sgm"]
     total_blank_places = 0
     total_blank_topics = 0
     total_countries = []
     total_topics = []
     root = TrieNode('*')
     
+    
     # Here, my algorithm for splitting the elements of the TOPICS and PLACES fields is my original work
     for source in sources:
-        print(source)
         with open(source) as f: # Open the file and read line by line to a list array
             array = []
             for line in f:
@@ -203,15 +208,6 @@ if __name__ == "__main__":
         distinct_countries = set(new_places)
         total_countries.extend(distinct_countries)
         
-        # Here I refer back to the original list of lines with the PLACES tag to locate blanks
-        # Since blank PLACES fields all had the same structure, counting them was a simple string comparison.
-        count_blanks = 0
-        for place in places:
-            if place == "<PLACES></PLACES>\n":
-                count_blanks += 1
-        total_blank_places += count_blanks
-        
-        
         # Next I moved onto TOPICS, using many of the same methods
         # that I used for PLACES to count and extract the information
         topics = []
@@ -231,18 +227,66 @@ if __name__ == "__main__":
         # There may end up being duplicates between documents that are not addressed
         # I address this issue in the final step: printing the statistics after all loops are finished
         total_topics.extend(distinct_topics)
+    
+    # Here, we create all output vectors already sorted into training and test groups based on cross-validation where k = 21
+    # These files are then fed into the classifier program 
+    for i in range(3):
+        training_sources = sources[:i] + sources[i+1:]
+        test_sources = []
+        test_sources.append(sources[i])
+        # Here we begin to make our bag of words vectors
+        # First we make the training groups
         
-        count_blanks = 0
-        for topic in topics:
-            if topic == "<TOPICS></TOPICS>\n":
-                count_blanks += 1
-        total_blank_topics += count_blanks
-    # Here we begin to make our country-based classifier
-    bag_vector = {}
-    for topic in sorted(set(total_topics)): #this can take quite a while, leave commented out for performance
-        if "<TOPICS>" not in topic:
-            get_text(topic, sources, bag_vector)
-    with open('topic_bag_train.csv', 'w') as csv_file:
-        writer = csv.writer(csv_file)
-        for key, value in bag_vector.items():
-            writer.writerow([key, value])
+        # TEST SET FOR SPEED
+        total_countries = ['afghanistan', 'uk', 'france', 'canada','turkey','usa','japan','pakistan']
+        total_topics = ['acq', 'alum', 'lumber', 'jobs', 'interest', 'income','trade', 'wheat']
+        # TEST
+        
+        
+        bag_vector = {}
+        for country in sorted(set(total_countries)):
+            if "<PLACES>" not in country:
+                get_text(country, training_sources, bag_vector, 'places')
+        with open('place_bag_train' + str(i) + '.csv', 'w') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(["country", "text"])
+            for key, value in bag_vector.items():
+                writer.writerow([key, value])
+        
+        bag_vector = {}
+        for topic in sorted(set(total_topics)):
+            if "<TOPICS>" not in topic:
+                get_text(topic, training_sources, bag_vector, 'topics')
+        with open('topic_bag_train' + str(i) + '.csv', 'w') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(["topic", "text"])
+            for key, value in bag_vector.items():
+                writer.writerow([key, value])
+        
+        # These two will be the test groups
+        bag_vector = {}
+        for country in sorted(set(total_countries)):
+            if "<PLACES>" not in country:
+                get_text(country, test_sources, bag_vector, 'places')
+        with open('place_bag_test' + str(i) + '.csv', 'w') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(["id", "text"])
+            for key, value in bag_vector.items():
+                writer.writerow([key, value])
+        
+        bag_vector = {}
+        for topic in sorted(set(total_topics)):
+            if "<TOPICS>" not in topic:
+                get_text(topic, test_sources, bag_vector, 'topics')
+        with open('topic_bag_test' + str(i) + '.csv', 'w') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(["id", "text"])
+            for key, value in bag_vector.items():
+                writer.writerow([key, value])
+                
+                
+                
+                
+                
+                
+                

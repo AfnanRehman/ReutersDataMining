@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 from nltk.tokenize import word_tokenize
 import decimal
 from decimal import Decimal
-csv.field_size_limit(100000000)
+csv.field_size_limit(100000000) # Expand to handle large field size of vector
 decimal.getcontext().prec = 1000
 
 def create_dist(text):
@@ -58,41 +58,43 @@ def NaiveBayes(dist):
 
 
 def recognize(sentence, nBS):
-    return nBS(word_tokenize(sentence.lower()))
+    try:
+        return nBS(word_tokenize(sentence.lower()))
+    except:
+        return nBS("")
 
 def predictions(test_x, nBS):
     d = []
     for index, row in test_x.iterrows():
         i, t = row['id'], row['text']
         p = recognize(t, nBS)
-        d.append({'id': i, 'canada': p['canada'], 'uk': p['uk']})
+        d.append({'id': i, 'canada': float(p['canada']), 'uk': float(p['uk'])})
     
     return pd.DataFrame(data=d)
 
-train_x = pd.read_csv("bag_train.csv", sep=',', encoding = "ISO-8859-1", engine='python')
-test_x = pd.read_csv("bag_test.csv", sep=',', encoding = "ISO-8859-1", engine='python')
-
-
-canada, uk, pakistan = "", "", ""
-
-for i, row in train_x.iterrows():
-    a, t = row['country'], row['text']
-    if a == 'canada':
-        canada += " " + t.lower()
-    elif a == 'uk':
-        uk += " " + t.lower()
-        
-print (uk[:50])
-
-canada = word_tokenize(canada)
-uk = word_tokenize(uk)
-
-print (uk[:50])
-c_canada, c_uk = create_dist(canada),  create_dist(uk)
-
-dist = {'canada': c_canada, 'uk': c_uk}
-nBS = NaiveBayes(dist)
-
-
-submission = predictions(test_x, nBS)
-submission.to_csv('submission.csv', index=False)
+for x in range(3):
+    
+    train_x = pd.read_csv("place_bag_train" + str(x) + ".csv", sep=',', encoding = "ISO-8859-1", engine='python')
+    test_x = pd.read_csv("place_bag_test" + str(x) + ".csv", sep=',', encoding = "ISO-8859-1", engine='python')
+    
+    
+    canada, uk = "", ""
+    
+    for i, row in train_x.iterrows():
+        a, t = row['country'], row['text']
+        if a == 'canada':
+            canada += " " + t.lower()
+        elif a == 'uk':
+            uk += " " + t.lower()
+    
+    canada = word_tokenize(canada)
+    uk = word_tokenize(uk)
+    
+    c_canada, c_uk = create_dist(canada),  create_dist(uk)
+    
+    dist = {'canada': c_canada, 'uk': c_uk}
+    nBS = NaiveBayes(dist)
+    
+    
+    submission = predictions(test_x, nBS)
+    submission.to_csv('results_place' + str(x) + '.csv', index=False)
