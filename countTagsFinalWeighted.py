@@ -280,7 +280,14 @@ def weighted_get_text(header_importance, place, sources, weighted_bag_vector, t_
 
 
 if __name__ == "__main__":
-    sources = ["files/reut2-000.sgm", "files/reut2-001.sgm", "files/reut2-002.sgm"]
+    sources = ["files/reut2-000.sgm", "files/reut2-001.sgm", "files/reut2-002.sgm", \
+               "files/reut2-003.sgm", "files/reut2-004.sgm", "files/reut2-005.sgm", \
+               "files/reut2-006.sgm", "files/reut2-007.sgm", "files/reut2-008.sgm", \
+               "files/reut2-009.sgm", "files/reut2-010.sgm", "files/reut2-011.sgm", \
+               "files/reut2-012.sgm", "files/reut2-013.sgm", "files/reut2-014.sgm", \
+               "files/reut2-015.sgm", "files/reut2-016.sgm", "files/reut2-017.sgm", \
+               "files/reut2-018.sgm", "files/reut2-019.sgm", "files/reut2-020.sgm", \
+               "files/reut2-021.sgm"]
                 
     total_blank_places = 0
     total_blank_topics = 0
